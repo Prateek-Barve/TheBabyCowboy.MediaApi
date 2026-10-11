@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TheBabyCowBoy.MediaApi.Data;
+using TheBabyCowBoy.MediaApi.Services;
+using TheBabyCowBoy.MediaApi.Services.Interfaces;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +22,9 @@ builder.Services.AddDbContext<MediaDbContext>(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddScoped<IMediaService, MediaService>();
+builder.Services.AddScoped<IGenreService, GenreService>();
 
 var app = builder.Build();
 
