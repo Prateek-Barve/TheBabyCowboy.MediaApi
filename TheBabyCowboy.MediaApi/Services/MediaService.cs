@@ -15,16 +15,94 @@ public class MediaService : IMediaService
         _context = context;
     }
 
-    public async Task<List<MediaItemResponse>> GetAllAsync(
-        string? category = null,
-        string? status = null,
-        string? genre = null)
+    //public async Task<List<MediaItemResponse>> GetAllAsync(
+    //    string? category = null,
+    //    string? status = null,
+    //    string? genre = null)
+    //{
+    //    var query = _context.MediaItems
+    //        .AsNoTracking()
+    //        .AsQueryable();
+
+    //    // Filter by category.
+    //    if (!string.IsNullOrWhiteSpace(category))
+    //    {
+    //        if (!Enum.GetNames<MediaCategory>()
+    //            .Contains(category, StringComparer.OrdinalIgnoreCase))
+    //        {
+    //            throw new ArgumentException("Invalid category.");
+    //        }
+
+    //        var parsedCategory = Enum.Parse<MediaCategory>(
+    //            category,
+    //            ignoreCase: true);
+
+    //        query = query.Where(m => m.Category == parsedCategory);
+    //    }
+
+    //    // Filter by status.
+    //    if (!string.IsNullOrWhiteSpace(status))
+    //    {
+    //        if (!Enum.GetNames<MediaStatus>()
+    //            .Contains(status, StringComparer.OrdinalIgnoreCase))
+    //        {
+    //            throw new ArgumentException("Invalid status.");
+    //        }
+
+    //        var parsedStatus = Enum.Parse<MediaStatus>(
+    //            status,
+    //            ignoreCase: true);
+
+    //        query = query.Where(m => m.Status == parsedStatus);
+    //    }
+
+    //    // Filter by genre slug.
+    //    if (!string.IsNullOrWhiteSpace(genre))
+    //    {
+    //        var genreSlug = genre.Trim().ToLowerInvariant();
+
+    //        query = query.Where(m =>
+    //            m.MediaItemGenres.Any(mg =>
+    //                mg.Genre.Slug == genreSlug));
+    //    }
+
+    //    var items = await query
+    //        .Include(m => m.MediaItemGenres)
+    //            .ThenInclude(mg => mg.Genre)
+    //        .Include(m => m.BookDetails)
+    //        .Include(m => m.MovieDetails)
+    //        .Include(m => m.SeriesDetails)
+    //        .Include(m => m.PlaylistDetails)
+    //        .OrderBy(m => m.DisplayOrder)
+    //        .ThenBy(m => m.Title)
+    //        .ToListAsync();
+
+    //    return items.Select(MapToResponse).ToList();
+    //}
+    public async Task<PagedResponse<MediaItemResponse>> GetAllAsync(
+    string? category = null,
+    string? status = null,
+    string? genre = null,
+    int page = 1,
+    int pageSize = 10)
     {
+        if (page < 1)
+        {
+            throw new ArgumentException(
+                "Page must be greater than or equal to 1.");
+        }
+
+        if (pageSize < 1 || pageSize > 100)
+        {
+            throw new ArgumentException(
+                "PageSize must be between 1 and 100.");
+        }
+
         var query = _context.MediaItems
             .AsNoTracking()
             .AsQueryable();
 
-        // Filter by category.
+        // Category filter
         if (!string.IsNullOrWhiteSpace(category))
         {
             if (!Enum.GetNames<MediaCategory>()
@@ -40,7 +118,7 @@ public class MediaService : IMediaService
             query = query.Where(m => m.Category == parsedCategory);
         }
 
-        // Filter by status.
+        // Status filter
         if (!string.IsNullOrWhiteSpace(status))
         {
             if (!Enum.GetNames<MediaStatus>()
@@ -56,7 +134,7 @@ public class MediaService : IMediaService
             query = query.Where(m => m.Status == parsedStatus);
         }
 
-        // Filter by genre slug.
+        // Genre filter
         if (!string.IsNullOrWhiteSpace(genre))
         {
             var genreSlug = genre.Trim().ToLowerInvariant();
@@ -66,6 +144,10 @@ public class MediaService : IMediaService
                     mg.Genre.Slug == genreSlug));
         }
 
+        // Count filtered records before pagination.
+        var totalCount = await query.CountAsync();
+
+        // Fetch only the requested page.
         var items = await query
             .Include(m => m.MediaItemGenres)
                 .ThenInclude(mg => mg.Genre)
@@ -75,9 +157,17 @@ public class MediaService : IMediaService
             .Include(m => m.PlaylistDetails)
             .OrderBy(m => m.DisplayOrder)
             .ThenBy(m => m.Title)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
 
-        return items.Select(MapToResponse).ToList();
+        return new PagedResponse<MediaItemResponse>
+        {
+            Items = items.Select(MapToResponse).ToList(),
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
 
     public async Task<MediaItemResponse?> GetByIdAsync(Guid id)

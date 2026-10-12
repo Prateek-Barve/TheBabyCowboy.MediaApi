@@ -390,6 +390,8 @@
 using Microsoft.AspNetCore.Mvc;
 using TheBabyCowBoy.MediaApi.DTOs;
 using TheBabyCowBoy.MediaApi.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using TheBabyCowBoy.MediaApi.Exceptions;
 
 namespace TheBabyCowBoy.MediaApi.Controllers;
 
@@ -405,20 +407,44 @@ public class MediaController : ControllerBase
     }
 
     // GET: /api/media
+    //[HttpGet]
+    //public async Task<ActionResult<List<MediaItemResponse>>> GetAll(
+    //    [FromQuery] string? category,
+    //    [FromQuery] string? status,
+    //    [FromQuery] string? genre)
+    //{
+    //    try
+    //    {
+    //        var items = await _mediaService.GetAllAsync(
+    //            category,
+    //            status,
+    //            genre);
+
+    //        return Ok(items);
+    //    }
+    //    catch (ArgumentException ex)
+    //    {
+    //        return BadRequest(new { message = ex.Message });
+    //    }
+    //}
     [HttpGet]
-    public async Task<ActionResult<List<MediaItemResponse>>> GetAll(
-        [FromQuery] string? category,
-        [FromQuery] string? status,
-        [FromQuery] string? genre)
+    public async Task<ActionResult<PagedResponse<MediaItemResponse>>> GetAll(
+    [FromQuery] string? category,
+    [FromQuery] string? status,
+    [FromQuery] string? genre,
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 10)
     {
         try
         {
-            var items = await _mediaService.GetAllAsync(
+            var result = await _mediaService.GetAllAsync(
                 category,
                 status,
-                genre);
+                genre,
+                page,
+                pageSize);
 
-            return Ok(items);
+            return Ok(result);
         }
         catch (ArgumentException ex)
         {
@@ -441,9 +467,27 @@ public class MediaController : ControllerBase
     }
 
     // POST: /api/media
+    //[HttpPost]
+    //public async Task<ActionResult<MediaItemResponse>> Create(
+    //    [FromBody] MediaItemCreateRequest request)
+    //{
+    //    try
+    //    {
+    //        var item = await _mediaService.CreateAsync(request);
+
+    //        return CreatedAtAction(
+    //            nameof(GetById),
+    //            new { id = item.Id },
+    //            item);
+    //    }
+    //    catch (ArgumentException ex)
+    //    {
+    //        return BadRequest(new { message = ex.Message });
+    //    }
+    //}
     [HttpPost]
     public async Task<ActionResult<MediaItemResponse>> Create(
-        [FromBody] MediaItemCreateRequest request)
+    [FromBody] MediaItemCreateRequest request)
     {
         try
         {
@@ -458,6 +502,31 @@ public class MediaController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+        catch (DbUpdateException ex)
+        {
+            if (DatabaseExceptionHandler.IsUniqueViolation(
+                ex, out var constraintName))
+            {
+                return Conflict(new
+                {
+                    message = GetDuplicateMessage(constraintName)
+                });
+            }
+
+            throw;
+        }
+    }
+
+    private static string GetDuplicateMessage(string? constraintName)
+    {
+        return constraintName switch
+        {
+            "IX_PlaylistDetails_SpotifyPlaylistId" =>
+                "A playlist with this Spotify playlist ID already exists.",
+
+            _ =>
+                "A record with the same unique value already exists."
+        };
     }
 
     // PUT: /api/media/{id}

@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using TheBabyCowBoy.MediaApi.DTOs;
 using TheBabyCowBoy.MediaApi.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using TheBabyCowBoy.MediaApi.Exceptions;
 
 namespace TheBabyCowBoy.MediaApi.Controllers;
+
 
 [ApiController]
 [Route("api/[controller]")]
@@ -39,9 +42,31 @@ public class GenresController : ControllerBase
     }
 
     // POST: /api/genres
+    //[HttpPost]
+    //public async Task<ActionResult<GenreResponse>> Create(
+    //    [FromBody] GenreCreateRequest request)
+    //{
+    //    try
+    //    {
+    //        var genre = await _genreService.CreateAsync(request);
+
+    //        return CreatedAtAction(
+    //            nameof(GetById),
+    //            new { id = genre.Id },
+    //            genre);
+    //    }
+    //    catch (ArgumentException ex)
+    //    {
+    //        return BadRequest(new { message = ex.Message });
+    //    }
+    //    catch (InvalidOperationException ex)
+    //    {
+    //        return Conflict(new { message = ex.Message });
+    //    }
+    //}
     [HttpPost]
     public async Task<ActionResult<GenreResponse>> Create(
-        [FromBody] GenreCreateRequest request)
+    [FromBody] GenreCreateRequest request)
     {
         try
         {
@@ -59,6 +84,19 @@ public class GenresController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return Conflict(new { message = ex.Message });
+        }
+        catch (DbUpdateException ex)
+        {
+            if (DatabaseExceptionHandler.IsUniqueViolation(
+                ex, out _))
+            {
+                return Conflict(new
+                {
+                    message = "A genre with this name or slug already exists."
+                });
+            }
+
+            throw;
         }
     }
 }
