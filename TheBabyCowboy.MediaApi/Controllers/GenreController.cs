@@ -3,6 +3,7 @@ using TheBabyCowBoy.MediaApi.DTOs;
 using TheBabyCowBoy.MediaApi.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using TheBabyCowBoy.MediaApi.Exceptions;
+using Microsoft.AspNetCore.Authorization;
 
 namespace TheBabyCowBoy.MediaApi.Controllers;
 
@@ -65,6 +66,7 @@ public class GenresController : ControllerBase
     //    }
     //}
     [HttpPost]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<GenreResponse>> Create(
     [FromBody] GenreCreateRequest request)
     {

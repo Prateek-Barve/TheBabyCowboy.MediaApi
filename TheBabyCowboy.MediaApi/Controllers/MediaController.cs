@@ -392,7 +392,7 @@ using TheBabyCowBoy.MediaApi.DTOs;
 using TheBabyCowBoy.MediaApi.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using TheBabyCowBoy.MediaApi.Exceptions;
-
+using Microsoft.AspNetCore.Authorization;
 namespace TheBabyCowBoy.MediaApi.Controllers;
 
 [ApiController]
@@ -486,6 +486,7 @@ public class MediaController : ControllerBase
     //    }
     //}
     [HttpPost]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<MediaItemResponse>> Create(
     [FromBody] MediaItemCreateRequest request)
     {
@@ -531,6 +532,7 @@ public class MediaController : ControllerBase
 
     // PUT: /api/media/{id}
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<MediaItemResponse>> Update(
         Guid id,
         [FromBody] MediaItemUpdateRequest request)
@@ -554,6 +556,7 @@ public class MediaController : ControllerBase
 
     // DELETE: /api/media/{id}
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var deleted = await _mediaService.DeleteAsync(id);
