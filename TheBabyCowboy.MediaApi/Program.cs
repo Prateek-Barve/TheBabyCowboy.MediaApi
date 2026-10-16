@@ -11,62 +11,115 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddControllers();
-var clerkIssuer = builder.Configuration["Clerk:Issuer"];
-var allowedUserId = builder.Configuration["Clerk:AllowedUserId"];
+//var clerkIssuer = builder.Configuration["Clerk:Issuer"];
+//var allowedUserId = builder.Configuration["Clerk:AllowedUserId"];
 
-if (string.IsNullOrWhiteSpace(clerkIssuer) ||
-    string.IsNullOrWhiteSpace(allowedUserId))
+//if (string.IsNullOrWhiteSpace(clerkIssuer) ||
+//    string.IsNullOrWhiteSpace(allowedUserId))
+//{
+//    throw new InvalidOperationException(
+//        "Clerk:Issuer and Clerk:AllowedUserId must be configured.");
+//}
+
+//var authorizedParties =
+//    builder.Configuration
+//        .GetSection("Clerk:AuthorizedParties")
+//        .Get<string[]>()
+//    ?? Array.Empty<string>();
+
+//builder.Services
+//    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+//    .AddJwtBearer(options =>
+//    {
+//        options.Authority = clerkIssuer;
+//        options.MapInboundClaims = false;
+
+//        options.TokenValidationParameters =
+//            new TokenValidationParameters
+//            {
+//                ValidateIssuer = true,
+//                ValidIssuer = clerkIssuer,
+
+//                // Clerk's default session token may not contain an audience.
+//                ValidateAudience = false,
+
+//                ValidateLifetime = true,
+//                ValidateIssuerSigningKey = true
+//            };
+
+//        options.Events = new JwtBearerEvents
+//        {
+//            OnTokenValidated = context =>
+//            {
+//                var azp = context.Principal?
+//                    .FindFirst("azp")?.Value;
+
+//                // If azp exists, it must match a configured frontend origin.
+//                if (!string.IsNullOrEmpty(azp) &&
+//                    !authorizedParties.Contains(
+//                        azp,
+//                        StringComparer.OrdinalIgnoreCase))
+//                {
+//                    context.Fail(
+//                        "The token was issued for an unauthorized frontend.");
+//                }
+
+//                return Task.CompletedTask;
+//            }
+//        };
+//    });
+
+//builder.Services.AddAuthorization(options =>
+//{
+//    options.AddPolicy("AdminOnly", policy =>
+//    {
+//        policy.RequireAuthenticatedUser();
+
+//        policy.RequireAssertion(context =>
+//            context.User.FindFirst("sub")?.Value == allowedUserId);
+//    });
+//});
+
+// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+//builder.Services.AddOpenApi();
+
+var entraAuthority = builder.Configuration["Entra:Authority"];
+var mediaApiClientId = builder.Configuration["Entra:MediaApiClientId"];
+var mediaApiAudience = builder.Configuration["Entra:Audience"];
+var allowedAdminObjectId =
+    builder.Configuration["Entra:AllowedAdminObjectId"];
+
+if (string.IsNullOrWhiteSpace(entraAuthority) ||
+    string.IsNullOrWhiteSpace(mediaApiClientId) ||
+    string.IsNullOrWhiteSpace(mediaApiAudience) ||
+    string.IsNullOrWhiteSpace(allowedAdminObjectId))
 {
     throw new InvalidOperationException(
-        "Clerk:Issuer and Clerk:AllowedUserId must be configured.");
+        "Entra authentication settings are missing.");
 }
-
-var authorizedParties =
-    builder.Configuration
-        .GetSection("Clerk:AuthorizedParties")
-        .Get<string[]>()
-    ?? Array.Empty<string>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = clerkIssuer;
+        options.Authority = entraAuthority;
         options.MapInboundClaims = false;
 
         options.TokenValidationParameters =
             new TokenValidationParameters
             {
                 ValidateIssuer = true,
-                ValidIssuer = clerkIssuer,
 
-                // Clerk's default session token may not contain an audience.
-                ValidateAudience = false,
+                ValidateAudience = true,
+                ValidAudiences = new[]
+                {
+                    mediaApiClientId,
+                    mediaApiAudience
+                },
 
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true
             };
-
-        options.Events = new JwtBearerEvents
-        {
-            OnTokenValidated = context =>
-            {
-                var azp = context.Principal?
-                    .FindFirst("azp")?.Value;
-
-                // If azp exists, it must match a configured frontend origin.
-                if (!string.IsNullOrEmpty(azp) &&
-                    !authorizedParties.Contains(
-                        azp,
-                        StringComparer.OrdinalIgnoreCase))
-                {
-                    context.Fail(
-                        "The token was issued for an unauthorized frontend.");
-                }
-
-                return Task.CompletedTask;
-            }
-        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -76,12 +129,14 @@ builder.Services.AddAuthorization(options =>
         policy.RequireAuthenticatedUser();
 
         policy.RequireAssertion(context =>
-            context.User.FindFirst("sub")?.Value == allowedUserId);
+            string.Equals(
+                context.User.FindFirst("oid")?.Value,
+                allowedAdminObjectId,
+                StringComparison.OrdinalIgnoreCase));
     });
 });
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-//builder.Services.AddOpenApi();
+
 
 var connectionString =
     builder.Configuration.GetConnectionString("MediaDatabase")
@@ -107,7 +162,8 @@ builder.Services.AddCors(options =>
                 "http://localhost:5173",
                 "https://localhost:5173",
                 "http://127.0.0.1:5173",
-                "https://127.0.0.1:5173"
+                "https://127.0.0.1:5173",
+                "https://blue-ground-0be55f310.5.azurestaticapps.net"
             )
             .AllowAnyHeader()
             .AllowAnyMethod();
